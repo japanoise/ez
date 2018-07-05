@@ -30,6 +30,18 @@ const (
 	TokenIdentInt
 	TokenConstStr
 	TokenConstInt
+	TokenAdd
+	TokenSub
+	TokenMul
+	TokenDiv
+	TokenRsh
+	TokenLsh
+	TokenAnd
+	TokenOr
+	TokenXor
+	TokenNand
+	TokenNor
+	TokenXnor
 )
 
 // Token ...
@@ -37,6 +49,10 @@ type Token struct {
 	Type       TokenType
 	IntData    int
 	StringData string
+}
+
+func isOperatorType(t TokenType) bool {
+	return t >= TokenAdd
 }
 
 func validIdentifierStrP(word string) (bool, bool) {
@@ -74,7 +90,7 @@ func lexExpr(words []string) ([]Token, error) {
 			valid, stringp := validIdentifierStrP(word)
 			if valid {
 				if stringp {
-					return nil, fmt.Errorf("Strings are not allowed in comparisons")
+					ret = append(ret, Token{Type: TokenIdentStr, StringData: word})
 				}
 				ret = append(ret, Token{Type: TokenIdentInt, StringData: word})
 			}
