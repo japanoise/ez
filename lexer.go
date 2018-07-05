@@ -101,7 +101,16 @@ func lexOp(word string) *Token {
 
 func lexExpr(words []string) ([]Token, error) {
 	ret := make([]Token, 0, len(words))
-	for _, word := range words {
+	snarf := -1
+	for i, word := range words {
+		if snarf != -1 {
+			ret[snarf].StringData += " " + word
+			wl := len(ret[snarf].StringData)
+			if ret[snarf].StringData[wl-1] == '"' {
+				ret[snarf].StringData = ret[snarf].StringData[:wl-1]
+				snarf = -1
+			}
+		}
 		op := lexOp(word)
 		if op != nil {
 			ret = append(ret, *op)
@@ -114,7 +123,22 @@ func lexExpr(words []string) ([]Token, error) {
 				ret = append(ret, Token{Type: TokenIdentStr, StringData: word})
 			}
 			ret = append(ret, Token{Type: TokenIdentInt, StringData: word})
+			continue
 		}
+
+		if len(word) > 0 && word[0] == '"' {
+			lw := len(word)
+			if lw == 1 {
+				ret = append(ret, Token{Type: TokenConstStr, StringData: ""})
+			} else if word[lw-1] == '"' {
+				ret = append(ret, Token{Type: TokenConstStr, StringData: word[1 : len(word)-1]})
+			} else {
+				ret = append(ret, Token{Type: TokenConstStr, StringData: word[1:]})
+				snarf = i
+			}
+			continue
+		}
+
 		num, err := strconv.Atoi(word)
 		if err != nil {
 			return nil, fmt.Errorf("Bad number \"%s\": %s", word, err.Error())
@@ -240,7 +264,7 @@ func Lex(words []string) ([]Token, error) {
 					} else if word[lw-1] == '"' {
 						ret = append(ret, Token{Type: TokenConstStr, StringData: word[1 : len(word)-1]})
 						snarf++
-						state = 'i'
+						state = 'e'
 					} else {
 						ret = append(ret, Token{Type: TokenConstStr, StringData: word[1:]})
 						state = 's'
