@@ -42,83 +42,105 @@ func predicateTrue(l []Token) (bool, error) {
 		return false, fmt.Errorf("Predicate too small")
 	}
 
-	ints := false
+	lint, rint := false, false
 	intl, intr := 0, 0
 	strl, strr := "", ""
 
 	switch l[0].Type {
 	case TokenConstInt:
 		intl = l[0].IntData
-		ints = true
+		lint = true
 	case TokenConstStr:
 		strl = l[0].StringData
-		ints = false
+		lint = false
 	case TokenIdentInt:
 		intl = intVars[l[0].StringData]
-		ints = true
+		lint = true
 	case TokenIdentStr:
 		strl = stringVars[l[0].StringData]
-		ints = false
+		lint = false
 	default:
 		return false, fmt.Errorf("Unexpected token on left hand side of IF statement %s", l[0].String())
 	}
 
 	switch l[2].Type {
 	case TokenConstInt:
-		if !ints {
-			return false, fmt.Errorf("Cannot compare integer and string")
-		}
 		intr = l[2].IntData
+		rint = true
 	case TokenConstStr:
-		if ints {
-			return false, fmt.Errorf("Cannot compare integer and string")
-		}
 		strr = l[2].StringData
+		rint = false
 	case TokenIdentInt:
-		if !ints {
-			return false, fmt.Errorf("Cannot compare integer and string")
-		}
 		intr = intVars[l[2].StringData]
+		rint = true
 	case TokenIdentStr:
-		if ints {
-			return false, fmt.Errorf("Cannot compare integer and string")
-		}
 		strr = stringVars[l[2].StringData]
+		rint = false
 	default:
 		return false, fmt.Errorf("Unexpected token on left hand side of IF statement %s", l[2].String())
 	}
 
 	switch l[1].Type {
 	case TokenEq:
-		if ints {
+		if lint && rint {
 			return intl == intr, nil
+		} else if !lint && !rint {
+			return strl == strr, nil
+		} else if lint && !rint {
+			return intl == len(strr), nil
+		} else {
+			return len(strl) == intr, nil
 		}
-		return strl == strr, nil
 	case TokenNe:
-		if ints {
+		if lint && rint {
 			return intl != intr, nil
+		} else if !lint && !rint {
+			return strl != strr, nil
+		} else if lint && !rint {
+			return intl != len(strr), nil
+		} else {
+			return len(strl) != intr, nil
 		}
-		return strl != strr, nil
 	case TokenGt:
-		if ints {
+		if lint && rint {
 			return intl > intr, nil
+		} else if !lint && !rint {
+			return strl > strr, nil
+		} else if lint && !rint {
+			return intl > len(strr), nil
+		} else {
+			return len(strl) > intr, nil
 		}
-		return strl > strr, nil
 	case TokenLt:
-		if ints {
+		if lint && rint {
 			return intl < intr, nil
+		} else if !lint && !rint {
+			return strl < strr, nil
+		} else if lint && !rint {
+			return intl < len(strr), nil
+		} else {
+			return len(strl) < intr, nil
 		}
-		return strl < strr, nil
 	case TokenGtEq:
-		if ints {
+		if lint && rint {
 			return intl >= intr, nil
+		} else if !lint && !rint {
+			return strl >= strr, nil
+		} else if lint && !rint {
+			return intl >= len(strr), nil
+		} else {
+			return len(strl) >= intr, nil
 		}
-		return strl >= strr, nil
 	case TokenLtEq:
-		if ints {
+		if lint && rint {
 			return intl <= intr, nil
+		} else if !lint && !rint {
+			return strl <= strr, nil
+		} else if lint && !rint {
+			return intl <= len(strr), nil
+		} else {
+			return len(strl) <= intr, nil
 		}
-		return strl <= strr, nil
 	default:
 		return false, fmt.Errorf("Not a comparison operator: %s", l[1].String())
 	}
