@@ -14,6 +14,7 @@ type TokenType uint8
 // The types of token in the program
 const (
 	TokenLet TokenType = iota
+	TokenFieldSep
 	TokenPrint
 	TokenExit
 	TokenGoto
@@ -34,14 +35,9 @@ const (
 	TokenSub
 	TokenMul
 	TokenDiv
-	TokenRsh
-	TokenLsh
 	TokenAnd
 	TokenOr
 	TokenXor
-	TokenNand
-	TokenNor
-	TokenXnor
 )
 
 // Token ...
@@ -70,36 +66,60 @@ func validIdentifierStrP(word string) (bool, bool) {
 
 var errInvalidIf = fmt.Errorf("IF statements must be in the form IF...THEN or IF...THEN...ELSE")
 
+func lexOp(word string) *Token {
+	switch word {
+	case "+":
+		return &Token{Type: TokenAdd}
+	case "-":
+		return &Token{Type: TokenSub}
+	case "*":
+		return &Token{Type: TokenMul}
+	case "/":
+		return &Token{Type: TokenMul}
+	case "&":
+		return &Token{Type: TokenAnd}
+	case "|":
+		return &Token{Type: TokenOr}
+	case "^":
+		return &Token{Type: TokenXor}
+	case "<":
+		return &Token{Type: TokenLt}
+	case "<=":
+		return &Token{Type: TokenLtEq}
+	case ">":
+		return &Token{Type: TokenGt}
+	case ">=":
+		return &Token{Type: TokenGtEq}
+	case "=", "==":
+		return &Token{Type: TokenEq}
+	case "!=":
+		return &Token{Type: TokenNe}
+	default:
+		return nil
+	}
+}
+
 func lexExpr(words []string) ([]Token, error) {
 	ret := make([]Token, 0, len(words))
 	for _, word := range words {
-		switch word {
-		case "<":
-			ret = append(ret, Token{Type: TokenLt})
-		case "<=":
-			ret = append(ret, Token{Type: TokenLtEq})
-		case ">":
-			ret = append(ret, Token{Type: TokenGt})
-		case ">=":
-			ret = append(ret, Token{Type: TokenGtEq})
-		case "=", "==":
-			ret = append(ret, Token{Type: TokenEq})
-		case "!=":
-			ret = append(ret, Token{Type: TokenNe})
-		default:
-			valid, stringp := validIdentifierStrP(word)
-			if valid {
-				if stringp {
-					ret = append(ret, Token{Type: TokenIdentStr, StringData: word})
-				}
-				ret = append(ret, Token{Type: TokenIdentInt, StringData: word})
-			}
-			num, err := strconv.Atoi(word)
-			if err != nil {
-				return nil, fmt.Errorf("Bad number \"%s\": %s", word, err.Error())
-			}
-			ret = append(ret, Token{Type: TokenConstInt, IntData: num})
+		op := lexOp(word)
+		if op != nil {
+			ret = append(ret, *op)
+			continue
 		}
+
+		valid, stringp := validIdentifierStrP(word)
+		if valid {
+			if stringp {
+				ret = append(ret, Token{Type: TokenIdentStr, StringData: word})
+			}
+			ret = append(ret, Token{Type: TokenIdentInt, StringData: word})
+		}
+		num, err := strconv.Atoi(word)
+		if err != nil {
+			return nil, fmt.Errorf("Bad number \"%s\": %s", word, err.Error())
+		}
+		ret = append(ret, Token{Type: TokenConstInt, IntData: num})
 	}
 	return ret, nil
 }
@@ -197,8 +217,15 @@ func Lex(words []string) ([]Token, error) {
 				}
 				state = 'e'
 			case 'e':
-				if word == "=" {
+				op := lexOp(word)
+				if op != nil {
+					ret = append(ret, *op)
+					snarf++
 					state = 'c'
+				} else if word == ";" {
+					ret = append(ret, Token{Type: TokenFieldSep})
+					snarf++
+					state = 'i'
 				} else {
 					return nil, fmt.Errorf("Unknown token %s in LET clause", word)
 				}
@@ -219,27 +246,40 @@ func Lex(words []string) ([]Token, error) {
 						state = 's'
 					}
 				} else {
+					valid, string := validIdentifierStrP(word)
+					if valid {
+						if string {
+							ret = append(ret, Token{Type: TokenIdentStr, StringData: word})
+						} else {
+							ret = append(ret, Token{Type: TokenIdentInt, StringData: word})
+						}
+						snarf++
+						state = 'e'
+						continue
+					}
 					num, err := strconv.Atoi(word)
 					if err != nil {
 						return nil, fmt.Errorf("Integer constant %s not parsed: %s", word, err.Error())
 					}
 					ret = append(ret, Token{Type: TokenConstInt, IntData: num})
 					snarf++
-					state = 'i'
+					state = 'e'
 				}
 			case 's':
 				ret[snarf].StringData += " " + word
 				wl := len(ret[snarf].StringData)
 				if ret[snarf].StringData[wl-1] == '"' {
 					ret[snarf].StringData = ret[snarf].StringData[:wl-1]
-					state = 'i'
+					state = 'e'
 					snarf++
 				}
 			}
 		}
-		if state != 'i' {
+		if !(state == 'e') {
 			switch state {
-			case 'e':
+			case 'i':
+				return nil, fmt.Errorf("Incomplete LET expression; expected identifier")
+			case 'c':
 				return nil, fmt.Errorf("Expected constant")
 			case 's':
 				return nil, fmt.Errorf("Unterminated string")

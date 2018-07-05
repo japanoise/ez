@@ -153,13 +153,115 @@ func execTokenList(l []Token) ([]Token, error) {
 			return execTokenList(l[elsePos+1:])
 		}
 	case TokenLet:
-		for i := 1; i < len(l); i += 2 {
-			if l[i+1].Type == TokenConstInt {
-				intVars[l[i].StringData] = l[i+1].IntData
-			} else if l[i+1].Type == TokenConstStr {
-				stringVars[l[i].StringData] = l[i+1].StringData
-			} else {
-				return nil, fmt.Errorf("Bad assignment in LET clause")
+		ident := ""
+		identi := false
+		mode := 'R' // replace
+		for i := 1; i < len(l); i++ {
+			if ident == "" {
+				if l[i].Type == TokenIdentInt || l[i].Type == TokenIdentStr {
+					ident = l[i].StringData
+					identi = l[i].Type == TokenIdentInt
+				} else {
+					return nil, fmt.Errorf("Not an identifier: %s", l[i].String())
+				}
+			} else if identi && (l[i].Type == TokenIdentInt || l[i].Type == TokenConstInt) {
+				switch mode {
+				case 'R':
+					if l[i].Type == TokenIdentInt {
+						intVars[ident] = intVars[l[i].StringData]
+					} else {
+						intVars[ident] = l[i].IntData
+					}
+				case '+':
+					if l[i].Type == TokenIdentInt {
+						intVars[ident] += intVars[l[i].StringData]
+					} else {
+						intVars[ident] += l[i].IntData
+					}
+				case '-':
+					if l[i].Type == TokenIdentInt {
+						intVars[ident] -= intVars[l[i].StringData]
+					} else {
+						intVars[ident] -= l[i].IntData
+					}
+				case '*':
+					if l[i].Type == TokenIdentInt {
+						intVars[ident] *= intVars[l[i].StringData]
+					} else {
+						intVars[ident] *= l[i].IntData
+					}
+				case '/':
+					divisor := 0
+					if l[i].Type == TokenIdentInt {
+						divisor = intVars[l[i].StringData]
+					} else {
+						divisor = l[i].IntData
+					}
+
+					if divisor == 0 {
+						return nil, fmt.Errorf("Division by zero")
+					}
+
+					intVars[ident] /= divisor
+				case '&':
+					if l[i].Type == TokenIdentInt {
+						intVars[ident] &= intVars[l[i].StringData]
+					} else {
+						intVars[ident] &= l[i].IntData
+					}
+				case '|':
+					if l[i].Type == TokenIdentInt {
+						intVars[ident] |= intVars[l[i].StringData]
+					} else {
+						intVars[ident] |= l[i].IntData
+					}
+				case '^':
+					if l[i].Type == TokenIdentInt {
+						intVars[ident] ^= intVars[l[i].StringData]
+					} else {
+						intVars[ident] ^= l[i].IntData
+					}
+				default:
+					return nil, fmt.Errorf("Tried to perform an illegal integer operation")
+				}
+			} else if !identi && (l[i].Type == TokenIdentStr || l[i].Type == TokenConstStr) {
+				if mode == 'R' {
+					if l[i].Type == TokenIdentStr {
+						stringVars[ident] = stringVars[l[i].StringData]
+					} else {
+						stringVars[ident] = l[i].StringData
+					}
+				} else if mode == '+' {
+					if l[i].Type == TokenIdentStr {
+						stringVars[ident] += stringVars[l[i].StringData]
+					} else {
+						stringVars[ident] += l[i].StringData
+					}
+				} else {
+					return nil, fmt.Errorf("Tried to perform an illegal string operation")
+				}
+			} else if l[i].Type == TokenFieldSep {
+				ident = ""
+				mode = 'R'
+			} else if l[i].Type == TokenEq {
+				mode = 'R'
+			} else if isOperatorType(l[i].Type) {
+				switch l[i].Type {
+				case TokenAdd:
+					mode = '+'
+				case TokenSub:
+					mode = '-'
+				case TokenMul:
+					mode = '*'
+				case TokenDiv:
+					mode = '/'
+				case TokenAnd:
+					mode = '&'
+				case TokenOr:
+					mode = '|'
+				case TokenXor:
+					mode = '^'
+				}
 			}
 		}
 	case TokenPrint:
