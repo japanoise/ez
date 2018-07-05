@@ -20,7 +20,7 @@ var lines []*Line = make([]*Line, MaxLines)
 func listLines() {
 	for i, line := range lines {
 		if line != nil && line.Used {
-			fmt.Printf("%d: %s\n", i, line.Content)
+			fmt.Printf("%d %s\n", i, line.Content)
 		}
 	}
 }
