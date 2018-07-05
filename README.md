@@ -46,7 +46,7 @@ The slightly more complicated Hello User:
 
 ```
 10 INPUT "What is your name?" u$
-20 IF u$ = 0 GOTO 10
+20 IF u$ = 0 THEN GOTO 10
 30 PRINT "Hello " u$
 40 END
 ```
