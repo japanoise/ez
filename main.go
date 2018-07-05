@@ -37,8 +37,121 @@ func listLinesDebug() {
 	}
 }
 
-func execTokenList(l []Token) error {
+func predicateTrue(l []Token) (bool, error) {
+	if len(l) < 3 {
+		return false, fmt.Errorf("Predicate too small")
+	}
+
+	ints := false
+	intl, intr := 0, 0
+	strl, strr := "", ""
+
 	switch l[0].Type {
+	case TokenConstInt:
+		intl = l[0].IntData
+		ints = true
+	case TokenConstStr:
+		strl = l[0].StringData
+		ints = false
+	case TokenIdentInt:
+		intl = intVars[l[0].StringData]
+		ints = true
+	case TokenIdentStr:
+		strl = stringVars[l[0].StringData]
+		ints = false
+	default:
+		return false, fmt.Errorf("Unexpected token on left hand side of IF statement %s", l[0].String())
+	}
+
+	switch l[2].Type {
+	case TokenConstInt:
+		if !ints {
+			return false, fmt.Errorf("Cannot compare integer and string")
+		}
+		intr = l[2].IntData
+	case TokenConstStr:
+		if ints {
+			return false, fmt.Errorf("Cannot compare integer and string")
+		}
+		strr = l[2].StringData
+	case TokenIdentInt:
+		if !ints {
+			return false, fmt.Errorf("Cannot compare integer and string")
+		}
+		intr = intVars[l[2].StringData]
+	case TokenIdentStr:
+		if ints {
+			return false, fmt.Errorf("Cannot compare integer and string")
+		}
+		strr = stringVars[l[2].StringData]
+	default:
+		return false, fmt.Errorf("Unexpected token on left hand side of IF statement %s", l[2].String())
+	}
+
+	switch l[1].Type {
+	case TokenEq:
+		if ints {
+			return intl == intr, nil
+		}
+		return strl == strr, nil
+	case TokenNe:
+		if ints {
+			return intl != intr, nil
+		}
+		return strl != strr, nil
+	case TokenGt:
+		if ints {
+			return intl > intr, nil
+		}
+		return strl > strr, nil
+	case TokenLt:
+		if ints {
+			return intl < intr, nil
+		}
+		return strl < strr, nil
+	case TokenGtEq:
+		if ints {
+			return intl >= intr, nil
+		}
+		return strl >= strr, nil
+	case TokenLtEq:
+		if ints {
+			return intl <= intr, nil
+		}
+		return strl <= strr, nil
+	default:
+		return false, fmt.Errorf("Not a comparison operator: %s", l[1].String())
+	}
+}
+
+func execTokenList(l []Token) ([]Token, error) {
+	switch l[0].Type {
+	case TokenExit, TokenGoto:
+		return l, nil
+	case TokenIf:
+		thenPos := -1
+		elsePos := -1
+		for i, token := range l[1:] {
+			if token.Type == TokenThen {
+				thenPos = i + 1
+			} else if token.Type == TokenElse {
+				elsePos = i + 1
+			}
+		}
+
+		pred, err := predicateTrue(l[1:thenPos])
+		if err != nil {
+			return nil, err
+		}
+
+		if pred {
+			if elsePos == -1 {
+				return execTokenList(l[thenPos+1:])
+			}
+			return execTokenList(l[thenPos+1 : elsePos])
+		} else if elsePos != -1 {
+			return execTokenList(l[elsePos+1:])
+		}
 	case TokenLet:
 		for i := 1; i < len(l); i += 2 {
 			if l[i+1].Type == TokenConstInt {
@@ -46,7 +159,7 @@ func execTokenList(l []Token) error {
 			} else if l[i+1].Type == TokenConstStr {
 				stringVars[l[i].StringData] = l[i+1].StringData
 			} else {
-				return fmt.Errorf("Bad assignment in LET clause")
+				return nil, fmt.Errorf("Bad assignment in LET clause")
 			}
 		}
 	case TokenPrint:
@@ -64,12 +177,12 @@ func execTokenList(l []Token) error {
 		}
 		fmt.Println()
 	default:
-		return fmt.Errorf("Unexpected token in this context: %s", l[0].String())
+		return nil, fmt.Errorf("Unexpected token in this context: %s", l[0].String())
 	}
-	return nil
+	return nil, nil
 }
 
-func execute(line *Line) error {
+func execute(line *Line) ([]Token, error) {
 	return execTokenList(line.Tokens)
 }
 
@@ -85,10 +198,20 @@ func execLines(lines []*Line) {
 				index = lines[index].Tokens[0].IntData
 				continue
 			default:
-				err := execute(lines[index])
+				extraTokens, err := execute(lines[index])
 				if err != nil {
 					fmt.Println(err.Error())
 					return
+				}
+
+				if extraTokens != nil {
+					switch extraTokens[0].Type {
+					case TokenExit:
+						return
+					case TokenGoto:
+						index = extraTokens[0].IntData
+						continue
+					}
 				}
 			}
 		}
@@ -151,7 +274,7 @@ func main() {
 			if err != nil {
 				fmt.Println(err.Error())
 			} else {
-				err = execute(line)
+				_, err = execute(line)
 				if err != nil {
 					fmt.Println(err.Error())
 				}

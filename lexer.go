@@ -21,6 +21,7 @@ const (
 	TokenThen
 	TokenElse
 	TokenEq
+	TokenNe
 	TokenGt
 	TokenLt
 	TokenGtEq
@@ -67,6 +68,8 @@ func lexExpr(words []string) ([]Token, error) {
 			ret = append(ret, Token{Type: TokenGtEq})
 		case "=", "==":
 			ret = append(ret, Token{Type: TokenEq})
+		case "!=":
+			ret = append(ret, Token{Type: TokenNe})
 		default:
 			valid, stringp := validIdentifierStrP(word)
 			if valid {
@@ -91,7 +94,8 @@ func Lex(words []string) ([]Token, error) {
 	ret := make([]Token, 0, len(words))
 	switch strings.ToUpper(words[0]) {
 	case "IF":
-		if len(words) < 4 {
+		lw := len(words)
+		if lw < 4 {
 			return nil, errInvalidIf
 		}
 		ret = append(ret, Token{Type: TokenIf})
@@ -113,21 +117,30 @@ func Lex(words []string) ([]Token, error) {
 		}
 		ret = append(ret, ifexpr...)
 		if elsePos == -1 {
-			thenexpr, err := Lex(words[thenPos+1 : elsePos])
+			if thenPos == lw-1 {
+				return nil, errInvalidIf
+			}
+			thenexpr, err := Lex(words[thenPos+1:])
 			if err != nil {
 				return nil, err
 			}
+			ret = append(ret, Token{Type: TokenThen})
 			ret = append(ret, thenexpr...)
 		} else {
+			if elsePos == lw-1 || thenPos == lw-1 {
+				return nil, errInvalidIf
+			}
 			thenexpr, err := Lex(words[thenPos+1 : elsePos])
 			if err != nil {
 				return nil, err
 			}
+			ret = append(ret, Token{Type: TokenThen})
 			ret = append(ret, thenexpr...)
 			elseexpr, err := Lex(words[elsePos+1:])
 			if err != nil {
 				return nil, err
 			}
+			ret = append(ret, Token{Type: TokenElse})
 			ret = append(ret, elseexpr...)
 		}
 		return ret, nil
