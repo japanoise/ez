@@ -77,7 +77,7 @@ func predicateTrue(l []Token) (bool, error) {
 		strr = stringVars[l[2].StringData]
 		rint = false
 	default:
-		return false, fmt.Errorf("Unexpected token on left hand side of IF statement %s", l[2].String())
+		return false, fmt.Errorf("Unexpected token on right hand side of IF statement %s", l[2].String())
 	}
 
 	switch l[1].Type {
@@ -173,6 +173,31 @@ func execTokenList(l []Token) ([]Token, error) {
 			return execTokenList(l[thenPos+1 : elsePos])
 		} else if elsePos != -1 {
 			return execTokenList(l[elsePos+1:])
+		}
+	case TokenInput:
+		prompt := ""
+		if l[1].Type == TokenConstStr {
+			prompt = l[1].StringData
+		} else if l[1].Type == TokenIdentStr {
+			prompt = stringVars[l[1].StringData]
+		} else {
+			return nil, fmt.Errorf("Unexpected token %s in INPUT statement", l[1].String())
+		}
+
+		if l[2].Type == TokenIdentInt {
+			var err error
+			intVars[l[2].StringData], err = InputNumber(prompt)
+			if err != nil {
+				return nil, err
+			}
+		} else if l[2].Type == TokenIdentStr {
+			var err error
+			stringVars[l[2].StringData], err = InputString(prompt)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, fmt.Errorf("Unexpected token %s in INPUT statement", l[2].String())
 		}
 	case TokenLet:
 		ident := ""

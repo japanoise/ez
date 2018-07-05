@@ -15,6 +15,7 @@ type TokenType uint8
 const (
 	TokenLet TokenType = iota
 	TokenFieldSep
+	TokenInput
 	TokenPrint
 	TokenExit
 	TokenGoto
@@ -65,6 +66,8 @@ func validIdentifierStrP(word string) (bool, bool) {
 }
 
 var errInvalidIf = fmt.Errorf("IF statements must be in the form IF...THEN or IF...THEN...ELSE")
+
+var errInvalidInput = fmt.Errorf("INPUT statements must be in the form INPUT PROMPT VAR")
 
 func lexOp(word string) *Token {
 	switch word {
@@ -121,8 +124,9 @@ func lexExpr(words []string) ([]Token, error) {
 		if valid {
 			if stringp {
 				ret = append(ret, Token{Type: TokenIdentStr, StringData: word})
+			} else {
+				ret = append(ret, Token{Type: TokenIdentInt, StringData: word})
 			}
-			ret = append(ret, Token{Type: TokenIdentInt, StringData: word})
 			continue
 		}
 
@@ -373,6 +377,61 @@ func Lex(words []string) ([]Token, error) {
 		}
 		if state == 's' {
 			return nil, fmt.Errorf("Unterminated string")
+		}
+	case "INPUT":
+		if len(words) < 3 {
+			return nil, errInvalidInput
+		}
+		ret = append(ret, Token{Type: TokenInput})
+		i := 2
+
+		valid, string := validIdentifierStrP(words[1])
+
+		if valid {
+			if string {
+				ret = append(ret, Token{Type: TokenIdentStr, StringData: words[1]})
+			} else {
+				return nil, fmt.Errorf("Cannot use integer variable as a prompt in INPUT")
+			}
+		} else if len(words[1]) > 0 && words[1][0] == '"' {
+			str := words[1][1:]
+			done := false
+			for i = 2; i < len(words); i++ {
+				if words[i] == "\"" {
+					str += " "
+					done = true
+					i++
+					break
+				}
+				wl := len(words[i])
+				if words[i][wl-1] == '"' {
+					str += " " + words[i][:wl-1]
+					done = true
+					i++
+					break
+				}
+				str += " " + words[i]
+			}
+			if !done {
+				return nil, fmt.Errorf("Unterminated string")
+			}
+			if i >= len(words) {
+				return nil, errInvalidInput
+			}
+			ret = append(ret, Token{Type: TokenConstStr, StringData: str})
+		} else {
+			return nil, errInvalidInput
+		}
+
+		valid, string = validIdentifierStrP(words[i])
+		if valid {
+			if string {
+				ret = append(ret, Token{Type: TokenIdentStr, StringData: words[i]})
+			} else {
+				ret = append(ret, Token{Type: TokenIdentInt, StringData: words[i]})
+			}
+		} else {
+			return nil, fmt.Errorf("Invalid identifier %s", words[i])
 		}
 	default:
 		return nil, fmt.Errorf("Unknown keyword %s", strings.ToUpper(words[0]))
