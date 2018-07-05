@@ -208,6 +208,16 @@ func Lex(words []string) ([]Token, error) {
 		if len(words) == 1 {
 			return nil, fmt.Errorf("GOTO statement requires a line number")
 		}
+
+		valid, string := validIdentifierStrP(words[1])
+		if valid {
+			if string {
+				return nil, fmt.Errorf("GOTO statement cannot use string variables")
+			}
+			ret = append(ret, Token{Type: TokenGoto, StringData: words[1]})
+			break
+		}
+
 		num, err := strconv.Atoi(words[1])
 		if err != nil {
 			return nil, fmt.Errorf("Bad line number \"%s\"; %s", words[1], err.Error())

@@ -319,6 +319,17 @@ func execLines(lines []*Line) {
 			case TokenExit:
 				return
 			case TokenGoto:
+				if lines[index].Tokens[0].StringData != "" {
+					newindex := intVars[lines[index].Tokens[0].StringData]
+					if 0 <= newindex && newindex < MaxLines {
+						index = newindex
+						continue
+					} else {
+						fmt.Printf("Fatal: GOTO index %d stored in %s out-of-bounds (should be in range 0-%d)\n",
+							newindex, lines[index].Tokens[0].StringData, MaxLines)
+						return
+					}
+				}
 				index = lines[index].Tokens[0].IntData
 				continue
 			default:
